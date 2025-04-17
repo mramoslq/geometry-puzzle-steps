@@ -1,6 +1,5 @@
 
-import { useState } from "react";
-import { Shape } from "./Shape";
+import { useState, useRef } from "react";
 import { Controls } from "./Controls";
 import { LevelDisplay } from "./LevelDisplay";
 import { Button } from "@/components/ui/button";
@@ -50,6 +49,10 @@ const generateLevel = (level: number): GameState => {
 export const GameBoard = () => {
   const [gameState, setGameState] = useState<GameState>(() => generateLevel(1));
   const [selectedBlock, setSelectedBlock] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [initialDragPosition, setInitialDragPosition] = useState({ x: 0, y: 0 });
+  const [initialBlockPosition, setInitialBlockPosition] = useState({ x: 0, y: 0 });
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const handleBlockClick = (blockId: number) => {
     setSelectedBlock(blockId);
@@ -127,6 +130,58 @@ export const GameBoard = () => {
     toast.info("Level restarted");
   };
 
+  const handleDragStart = (e: React.MouseEvent, blockId: number) => {
+    e.preventDefault();
+    if (gameState.movesLeft <= 0) return;
+    
+    setSelectedBlock(blockId);
+    setIsDragging(true);
+    setInitialDragPosition({ x: e.clientX, y: e.clientY });
+    
+    const block = gameState.blocks.find(b => b.id === blockId);
+    if (block) {
+      setInitialBlockPosition({ x: block.x, y: block.y });
+    }
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !boardRef.current || selectedBlock === null || gameState.movesLeft <= 0) return;
+
+    const deltaX = e.clientX - initialDragPosition.x;
+    const deltaY = e.clientY - initialDragPosition.y;
+    
+    const boardRect = boardRef.current.getBoundingClientRect();
+    const cellSize = boardRect.width / BOARD_SIZE;
+    
+    const xMove = Math.round(deltaX / cellSize);
+    const yMove = Math.round(deltaY / cellSize);
+    
+    if (Math.abs(xMove) >= 1 || Math.abs(yMove) >= 1) {
+      // Determine movement direction
+      let direction: 'left' | 'right' | 'up' | 'down' | null = null;
+      
+      if (Math.abs(xMove) > Math.abs(yMove)) {
+        direction = xMove > 0 ? 'right' : 'left';
+      } else {
+        direction = yMove > 0 ? 'down' : 'up';
+      }
+      
+      if (direction) {
+        moveBlock(direction);
+        // Reset for the next drag
+        const block = gameState.blocks.find(b => b.id === selectedBlock);
+        if (block) {
+          setInitialDragPosition({ x: e.clientX, y: e.clientY });
+          setInitialBlockPosition({ x: block.x, y: block.y });
+        }
+      }
+    }
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6">
       <LevelDisplay level={gameState.level} targetMoves={INITIAL_MOVES} />
@@ -135,6 +190,7 @@ export const GameBoard = () => {
         <div className="bg-white p-6 rounded-lg shadow-md">
           <h3 className="text-lg font-medium mb-4">Sliding Blocks Puzzle</h3>
           <div 
+            ref={boardRef}
             className="relative w-[300px] h-[300px] mx-auto bg-gray-100 rounded-lg"
             style={{
               display: 'grid',
@@ -142,7 +198,21 @@ export const GameBoard = () => {
               gap: '2px',
               padding: '2px'
             }}
+            onMouseMove={handleMouseMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
           >
+            {/* Exit marker */}
+            <div 
+              className="absolute h-full w-8 right-0 bg-green-100 flex items-center justify-center"
+              style={{
+                borderLeft: '2px dashed #22c55e',
+                zIndex: 0
+              }}
+            >
+              <div className="h-12 w-4 bg-green-500 rounded-r-md" />
+            </div>
+
             {gameState.blocks.map(block => (
               <div
                 key={block.id}
@@ -154,33 +224,31 @@ export const GameBoard = () => {
                   top: `${(block.y / BOARD_SIZE) * 100}%`,
                   width: `${(block.width / BOARD_SIZE) * 100}%`,
                   height: `${(block.height / BOARD_SIZE) * 100}%`,
-                  cursor: 'pointer'
+                  cursor: 'move',
+                  zIndex: 10
                 }}
                 onClick={() => handleBlockClick(block.id)}
+                onMouseDown={(e) => handleDragStart(e, block.id)}
               />
             ))}
+          </div>
+          
+          <div className="text-center mt-4">
+            <p className="text-sm text-gray-600 mb-2">Drag blocks to move them. Get the red block to the green exit.</p>
+            <p className="text-sm font-medium text-gray-600">Moves left: {gameState.movesLeft}</p>
           </div>
         </div>
       </div>
 
-      <div className="mt-8">
-        <Controls
-          onMoveLeft={() => moveBlock('left')}
-          onMoveRight={() => moveBlock('right')}
-          onMoveUp={() => moveBlock('up')}
-          onMoveDown={() => moveBlock('down')}
-          movesLeft={gameState.movesLeft}
-        />
-        <div className="mt-4 flex justify-center">
-          <Button
-            onClick={handleRestartLevel}
-            variant="outline"
-            className="w-full max-w-xs"
-          >
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Restart Level
-          </Button>
-        </div>
+      <div className="mt-8 flex justify-center">
+        <Button
+          onClick={handleRestartLevel}
+          variant="outline"
+          className="w-full max-w-xs"
+        >
+          <RotateCcw className="w-4 h-4 mr-2" />
+          Restart Level
+        </Button>
       </div>
     </div>
   );
