@@ -3,7 +3,7 @@ import { Shape } from "./Shape";
 import { Controls } from "./Controls";
 import { LevelDisplay } from "./LevelDisplay";
 import { Button } from "@/components/ui/button";
-import { Check } from "lucide-react";
+import { Check, RotateCcw } from "lucide-react";
 import { toast } from "@/components/ui/sonner";
 
 interface GameState {
@@ -25,12 +25,10 @@ interface GameState {
 const INITIAL_MOVES = 5;
 
 const generateLevel = (level: number): GameState => {
-  // For now, we'll keep it simple with just increasing difficulty
   const shapes = [
     { id: 1, type: "triangle" as const, size: "md" as const, rotation: 0 }
   ];
   
-  // Example progression: each level rotates target more and makes it larger
   const targetShape = {
     type: "triangle" as const,
     size: level === 1 ? "lg" as const : "lg" as const,
@@ -99,6 +97,11 @@ export const GameBoard = () => {
     }));
   };
 
+  const handleRestartLevel = () => {
+    setGameState(generateLevel(gameState.level));
+    toast.info("Level restarted");
+  };
+
   const checkShapes = () => {
     const currentShape = gameState.shapes[0];
     const targetShape = gameState.targetShape;
@@ -155,7 +158,15 @@ export const GameBoard = () => {
           onDuplicate={handleDuplicate}
           movesLeft={gameState.movesLeft}
         />
-        <div className="mt-4 flex justify-center">
+        <div className="mt-4 flex justify-center gap-4">
+          <Button
+            onClick={handleRestartLevel}
+            variant="outline"
+            className="w-full max-w-xs"
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Restart Level
+          </Button>
           <Button
             onClick={checkShapes}
             className="w-full max-w-xs"
